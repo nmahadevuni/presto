@@ -15,6 +15,7 @@
     <properties>
         <air.main.basedir>${project.parent.basedir}</air.main.basedir>
         <air.checkstyle.config-file>src/checkstyle/presto-checks.xml</air.checkstyle.config-file>
+        <dep.iceberg.version>1.4.3</dep.iceberg.version>
     </properties>
 
     <dependencies>
@@ -125,6 +126,70 @@
                 <exclusion>
                     <groupId>org.apache.parquet</groupId>
                     <artifactId>parquet-format-structures</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.iceberg</groupId>
+            <artifactId>iceberg-api</artifactId>
+            <version>${dep.iceberg.version}</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.apache.iceberg</groupId>
+                    <artifactId>iceberg-bundled-guava</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.slf4j</groupId>
+                    <artifactId>slf4j-api</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.iceberg</groupId>
+            <artifactId>iceberg-core</artifactId>
+            <version>${dep.iceberg.version}</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.apache.avro</groupId>
+                    <artifactId>avro</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>com.google.errorprone</groupId>
+                    <artifactId>error_prone_annotations</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.checkerframework</groupId>
+                    <artifactId>checker-qual</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>com.fasterxml.jackson.core</groupId>
+                    <artifactId>jackson-core</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>com.fasterxml.jackson.core</groupId>
+                    <artifactId>jackson-databind</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.apache.iceberg</groupId>
+                    <artifactId>iceberg-bundled-guava</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.slf4j</groupId>
+                    <artifactId>slf4j-api</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.roaringbitmap</groupId>
+                    <artifactId>RoaringBitmap</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>commons-codec</groupId>
+                    <artifactId>commons-codec</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>io.airlift</groupId>
+                    <artifactId>aircompressor</artifactId>
                 </exclusion>
             </exclusions>
         </dependency>
