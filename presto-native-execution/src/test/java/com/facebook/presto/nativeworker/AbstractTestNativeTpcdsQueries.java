@@ -41,7 +41,7 @@ public abstract class AbstractTestNativeTpcdsQueries
                 .setSystemProperty(QUERY_MAX_RUN_TIME, "2m")
                 .setSystemProperty(QUERY_MAX_EXECUTION_TIME, "2m")
                 .build();
-
+        tearDown();
         createTpcdsCallCenter(queryRunner, session, storageFormat);
         createTpcdsCatalogPage(queryRunner, session);
         createTpcdsCatalogReturns(queryRunner, session);
@@ -1161,4 +1161,6 @@ public abstract class AbstractTestNativeTpcdsQueries
     {
         assertQuery(session, getTpcdsQuery("99"));
     }
+
+    protected void tearDown() {}
 }
