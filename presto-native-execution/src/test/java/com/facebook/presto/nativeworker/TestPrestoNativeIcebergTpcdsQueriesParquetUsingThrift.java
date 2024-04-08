@@ -404,7 +404,14 @@ public class TestPrestoNativeIcebergTpcdsQueriesParquetUsingThrift
         for (Map.Entry<String, List<String>> kv : tableToDeleteTableMap.entrySet()) {
             for (String deleteTableName : kv.getValue()) {
                 if (deleteTableRecordCount.get(deleteTableName) > 0) {
-                    addDeleteFiles(kv.getKey(), deleteTableName);
+                    //addDeleteFiles(kv.getKey(), deleteTableName);
+                    String schemaTableName = "tpcds" + "." + kv.getKey();
+                    String deleteSchemaTableName = "tpcds" + "." + deleteTableName;
+                    assertUpdateExpected(session,
+                            format("CALL system.add_equality_deletes('%s','%s','%s')",
+                                    schemaTableName,
+                                    deleteSchemaTableName,
+                                    deleteTableToColumnMap.get(deleteTableName)));
                 }
             }
         }
