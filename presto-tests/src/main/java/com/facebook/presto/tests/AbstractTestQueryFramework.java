@@ -164,6 +164,12 @@ public abstract class AbstractTestQueryFramework
         QueryAssertions.assertQuery(queryRunner, getSession(), actual, expectedQueryRunner, expected, false, false);
     }
 
+    protected void assertQueryWithSameExpectedQueryRunner(@Language("SQL") String actual, @Language("SQL") String expected)
+    {
+        checkArgument(!actual.equals(expected));
+        QueryAssertions.assertQuery((QueryRunner) expectedQueryRunner, getSession(), actual, expectedQueryRunner, expected, false, false);
+    }
+
     protected void assertQueryWithSameQueryRunner(@Language("SQL") String actual, @Language("SQL") String expected)
     {
         checkArgument(!actual.equals(expected));
@@ -262,6 +268,16 @@ public abstract class AbstractTestQueryFramework
     protected void assertUpdate(Session session, @Language("SQL") String sql, long count, Consumer<Plan> planAssertion)
     {
         QueryAssertions.assertUpdate(queryRunner, session, sql, OptionalLong.of(count), Optional.of(planAssertion));
+    }
+
+    protected void assertUpdateExpected(Session session, @Language("SQL") String sql)
+    {
+        QueryAssertions.assertUpdate(queryRunner, session, sql, OptionalLong.empty(), Optional.empty());
+    }
+
+    protected void assertUpdateExpected(Session session, @Language("SQL") String sql, long count)
+    {
+        QueryAssertions.assertUpdate((QueryRunner) expectedQueryRunner, session, sql, OptionalLong.of(count), Optional.empty());
     }
 
     protected void assertQuerySucceeds(Session session, @Language("SQL") String sql)

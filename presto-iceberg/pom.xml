@@ -12,7 +12,6 @@
 
     <properties>
         <air.main.basedir>${project.parent.basedir}</air.main.basedir>
-        <dep.iceberg.version>1.5.0</dep.iceberg.version>
         <dep.nessie.version>0.77.1</dep.nessie.version>
     </properties>
 

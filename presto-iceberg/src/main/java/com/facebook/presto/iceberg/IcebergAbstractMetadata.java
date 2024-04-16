@@ -21,10 +21,16 @@ import com.facebook.presto.common.type.BigintType;
 import com.facebook.presto.common.type.SqlTimestampWithTimeZone;
 import com.facebook.presto.common.type.TimestampWithTimeZoneType;
 import com.facebook.presto.common.type.TypeManager;
+import com.facebook.presto.hive.FileFormatDataSourceStats;
+import com.facebook.presto.hive.HdfsContext;
+import com.facebook.presto.hive.HdfsEnvironment;
 import com.facebook.presto.hive.HivePartition;
 import com.facebook.presto.hive.HiveWrittenPartitions;
 import com.facebook.presto.hive.NodeVersion;
+import com.facebook.presto.hive.parquet.HdfsParquetDataSource;
 import com.facebook.presto.iceberg.changelog.ChangelogUtil;
+import com.facebook.presto.parquet.ParquetDataSourceId;
+import com.facebook.presto.parquet.cache.MetadataReader;
 import com.facebook.presto.spi.ColumnHandle;
 import com.facebook.presto.spi.ColumnMetadata;
 import com.facebook.presto.spi.ConnectorInsertTableHandle;
@@ -62,6 +68,8 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 import io.airlift.slice.Slice;
+import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.iceberg.AppendFiles;
 import org.apache.iceberg.BaseTable;
@@ -86,6 +94,8 @@ import org.apache.iceberg.types.Type;
 import org.apache.iceberg.types.TypeUtil;
 import org.apache.iceberg.types.Types;
 import org.apache.iceberg.util.CharSequenceSet;
+import org.apache.parquet.hadoop.metadata.BlockMetaData;
+import org.apache.parquet.hadoop.metadata.ParquetMetadata;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -109,10 +119,12 @@ import static com.facebook.presto.hive.MetadataUtils.getDiscretePredicates;
 import static com.facebook.presto.hive.MetadataUtils.getPredicate;
 import static com.facebook.presto.hive.MetadataUtils.getSubfieldPredicate;
 import static com.facebook.presto.iceberg.ExpressionConverter.toIcebergExpression;
+import static com.facebook.presto.iceberg.FileFormat.PARQUET;
 import static com.facebook.presto.iceberg.IcebergColumnHandle.DATA_SEQUENCE_NUMBER_COLUMN_HANDLE;
 import static com.facebook.presto.iceberg.IcebergColumnHandle.DATA_SEQUENCE_NUMBER_COLUMN_METADATA;
 import static com.facebook.presto.iceberg.IcebergColumnHandle.PATH_COLUMN_HANDLE;
 import static com.facebook.presto.iceberg.IcebergColumnHandle.PATH_COLUMN_METADATA;
+import static com.facebook.presto.iceberg.IcebergErrorCode.ICEBERG_FILESYSTEM_ERROR;
 import static com.facebook.presto.iceberg.IcebergErrorCode.ICEBERG_INVALID_SNAPSHOT_ID;
 import static com.facebook.presto.iceberg.IcebergMetadataColumn.DATA_SEQUENCE_NUMBER;
 import static com.facebook.presto.iceberg.IcebergMetadataColumn.FILE_PATH;
@@ -146,6 +158,7 @@ import static com.facebook.presto.iceberg.TypeConverter.toIcebergType;
 import static com.facebook.presto.iceberg.TypeConverter.toPrestoType;
 import static com.facebook.presto.iceberg.changelog.ChangelogUtil.getRowTypeFromColumnMeta;
 import static com.facebook.presto.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
+import static com.facebook.presto.spi.StandardErrorCode.INVALID_ARGUMENTS;
 import static com.facebook.presto.spi.StandardErrorCode.NOT_SUPPORTED;
 import static com.facebook.presto.spi.statistics.TableStatisticType.ROW_COUNT;
 import static com.google.common.base.Verify.verify;
@@ -154,6 +167,7 @@ import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static java.lang.String.format;
 import static java.util.Collections.singletonList;
+import static java.util.Locale.ENGLISH;
 import static java.util.Objects.requireNonNull;
 import static org.apache.iceberg.MetadataColumns.ROW_POSITION;
 
@@ -952,5 +966,112 @@ public abstract class IcebergAbstractMetadata
             throw new PrestoException(NOT_SUPPORTED, "Unsupported table version expression type: " + tableVersion.getVersionExpressionType());
         }
         throw new PrestoException(NOT_SUPPORTED, "Unsupported table version type: " + tableVersion.getVersionType());
+    }
+
+    public static long getParquetFileRowCount(String parquetFilePath, FileSystem fileSystem, long fileSize)
+            throws IOException
+    {
+        FileFormatDataSourceStats stats = new FileFormatDataSourceStats();
+        HdfsParquetDataSource hdfsParquetDataSource = new HdfsParquetDataSource(
+                new ParquetDataSourceId(parquetFilePath.toString()),
+                fileSystem.open(new Path(parquetFilePath)), stats);
+
+        ParquetMetadata parquetMetadata = MetadataReader.readFooter(hdfsParquetDataSource, fileSize, Optional.empty(), false).getParquetMetadata();
+        long rowCount = 0;
+        for (BlockMetaData blockMetaData : parquetMetadata.getBlocks()) {
+            rowCount += blockMetaData.getRowCount();
+        }
+        return rowCount;
+    }
+
+    protected void addEqualityDeletes(ConnectorSession clientSession, SchemaTableName schemaTableName, SchemaTableName deleteFilesSchemaTable, String deleteColumnNames, HdfsEnvironment hdfsEnvironment)
+            throws IOException
+    {
+        Table icebergTable = getIcebergTable(clientSession, schemaTableName);
+        com.facebook.presto.iceberg.FileFormat fileFormat = getFileFormat(icebergTable);
+
+        if (fileFormat != PARQUET) {
+            throw new PrestoException(INVALID_ARGUMENTS, format("Add Equality deletes procedure is only supported for parquet format tables."));
+        }
+
+        Path deleteTablePath = new Path(getIcebergTable(clientSession, deleteFilesSchemaTable).location() + "/data/");
+        FileSystem fileSystem = getFileSystem(clientSession, hdfsEnvironment, deleteFilesSchemaTable, deleteTablePath);
+        FileStatus[] deleteFiles = fileSystem.listStatus(deleteTablePath, (p -> p.getName().endsWith(fileFormat.name().toLowerCase(ENGLISH))));
+
+        if (deleteFiles.length == 0) {
+            throw new PrestoException(INVALID_ARGUMENTS, format("Delete file table %s does not contain any %s files", deleteFilesSchemaTable, fileFormat.name()));
+        }
+
+        Transaction transaction = icebergTable.newTransaction();
+        RowDelta rowDelta = transaction.newRowDelta();
+        for (FileStatus deleteFilePath : deleteFiles) {
+            System.out.println("Delete File location " + deleteFilePath);
+            String fullDeleteFilePath = deleteTablePath + "/" + deleteFilePath.getPath().getName();
+            long rowCount = getParquetFileRowCount(fullDeleteFilePath, fileSystem, deleteFilePath.getLen());
+            CommitTaskData task = new CommitTaskData(fullDeleteFilePath,
+                    deleteFilePath.getLen(),
+                    new MetricsWrapper(rowCount,
+                            ImmutableMap.of(),
+                            ImmutableMap.of(),
+                            ImmutableMap.of(),
+                            ImmutableMap.of(),
+                            ImmutableMap.of(),
+                            ImmutableMap.of()),
+                    0,
+                    Optional.empty(),
+                    fileFormat, null);
+
+            {
+                PartitionSpec spec = icebergTable.specs().get(0);
+                int[] fieldIds;
+                if (deleteColumnNames.equals("*")) {
+                    fieldIds = icebergTable.schema().columns().stream().mapToInt(c -> c.fieldId()).toArray();
+                }
+                else {
+                    fieldIds = icebergTable.schema().select(deleteColumnNames).columns().stream().mapToInt(c -> c.fieldId()).toArray();
+                }
+
+                if (fieldIds.length == 0) {
+                    throw new PrestoException(INVALID_ARGUMENTS, format("Invalid delete column names: %s", deleteColumnNames));
+                }
+
+                FileMetadata.Builder builder = FileMetadata.deleteFileBuilder(spec)
+                        .ofEqualityDeletes(fieldIds)
+                        .withPath(task.getPath())
+                        .withFileSizeInBytes(task.getFileSizeInBytes())
+                        .withFormat(fileFormat.name())
+                        .withMetrics(task.getMetrics().metrics());
+
+                if (!spec.fields().isEmpty()) {
+                    String partitionDataJson = task.getPartitionDataJson()
+                            .orElseThrow(() -> new VerifyException("No partition data for partitioned table"));
+                    Type[] partitionColumnTypes = spec.fields().stream()
+                            .map(field -> field.transform().getResultType(
+                                    spec.schema().findType(field.sourceId())))
+                            .toArray(Type[]::new);
+                    builder.withPartition(PartitionData.fromJson(partitionDataJson, partitionColumnTypes));
+                }
+                rowDelta.addDeletes(builder.build());
+            }
+        }
+        rowDelta.commit();
+        transaction.commitTransaction();
+    }
+
+    public static FileSystem getFileSystem(ConnectorSession clientSession, HdfsEnvironment hdfsEnvironment, SchemaTableName schemaTableName, Path location)
+    {
+        HdfsContext hdfsContext = new HdfsContext(
+                clientSession,
+                schemaTableName.getSchemaName(),
+                schemaTableName.getTableName(),
+                location.getName(),
+                true);
+
+        try {
+            return hdfsEnvironment.getFileSystem(hdfsContext, location);
+        }
+        catch (Exception e) {
+            throw new PrestoException(ICEBERG_FILESYSTEM_ERROR, format("Error getting file system at path %s", location), e);
+        }
     }
 }
