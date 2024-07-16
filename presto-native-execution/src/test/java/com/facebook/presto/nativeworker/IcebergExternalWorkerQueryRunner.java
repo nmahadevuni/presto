@@ -15,7 +15,6 @@ package com.facebook.presto.nativeworker;
 
 import com.facebook.airlift.log.Logger;
 import com.facebook.airlift.log.Logging;
-import com.facebook.presto.testing.QueryRunner;
 import com.facebook.presto.tests.DistributedQueryRunner;
 
 public class IcebergExternalWorkerQueryRunner
@@ -28,14 +27,18 @@ public class IcebergExternalWorkerQueryRunner
         // You need to add "--user user" to your CLI for your queries to work.
         Logging.initialize();
 
-        // Create tables before launching distributed runner.
-        QueryRunner javaQueryRunner = PrestoNativeQueryRunnerUtils.createJavaIcebergQueryRunner(false);
-        NativeQueryRunnerUtils.createAllIcebergTables(javaQueryRunner);
-        javaQueryRunner.close();
-
-        // Launch distributed runner.
-        DistributedQueryRunner queryRunner = (DistributedQueryRunner) PrestoNativeQueryRunnerUtils.createNativeIcebergQueryRunner(true, false);
-        Thread.sleep(10);
+//        // Create tables before launching distributed runner.
+//        QueryRunner javaQueryRunner = PrestoNativeQueryRunnerUtils.createJavaIcebergQueryRunner(false);
+//        NativeQueryRunnerUtils.createAllIcebergTables(javaQueryRunner);
+//        javaQueryRunner.close();
+//
+//        // Launch distributed runner.
+//        DistributedQueryRunner queryRunner = (DistributedQueryRunner) PrestoNativeQueryRunnerUtils.createNativeIcebergQueryRunner(true, false);
+//        Thread.sleep(10);
+        TestPrestoNativeIcebergTpcdsQueriesParquetUsingThrift test = new TestPrestoNativeIcebergTpcdsQueriesParquetUsingThrift();
+        test.init();
+        test.doDeletesAndQuery();
+        DistributedQueryRunner queryRunner = (DistributedQueryRunner) test.getQueryRunner();
         Logger log = Logger.get(DistributedQueryRunner.class);
         log.info("======== SERVER STARTED ========");
         log.info("\n====\n%s\n====", queryRunner.getCoordinator().getBaseUrl());

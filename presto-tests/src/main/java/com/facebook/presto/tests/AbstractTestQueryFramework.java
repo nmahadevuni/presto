@@ -589,7 +589,7 @@ public abstract class AbstractTestQueryFramework
         }
     }
 
-    protected QueryRunner getQueryRunner()
+    public QueryRunner getQueryRunner()
     {
         checkState(queryRunner != null, "queryRunner not set");
         return queryRunner;
