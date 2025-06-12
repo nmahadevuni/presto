@@ -35,11 +35,11 @@ import com.facebook.presto.common.type.UserDefinedType;
 import com.facebook.presto.operator.window.WindowFunctionSupplier;
 import com.facebook.presto.spi.NodeManager;
 import com.facebook.presto.spi.PrestoException;
+import com.facebook.presto.spi.function.AbstractFunctionAndTypeManager;
 import com.facebook.presto.spi.function.AggregationFunctionImplementation;
 import com.facebook.presto.spi.function.AlterRoutineCharacteristics;
 import com.facebook.presto.spi.function.FunctionHandle;
 import com.facebook.presto.spi.function.FunctionMetadata;
-import com.facebook.presto.spi.function.FunctionMetadataManager;
 import com.facebook.presto.spi.function.FunctionNamespaceManager;
 import com.facebook.presto.spi.function.FunctionNamespaceManagerContext;
 import com.facebook.presto.spi.function.FunctionNamespaceManagerFactory;
@@ -125,7 +125,7 @@ import static java.util.concurrent.TimeUnit.HOURS;
  */
 @ThreadSafe
 public class FunctionAndTypeManager
-        implements FunctionMetadataManager, TypeManager
+        extends AbstractFunctionAndTypeManager
 {
     private static final Pattern DEFAULT_NAMESPACE_PREFIX_PATTERN = Pattern.compile("[a-z]+\\.[a-z]+");
     private final TransactionManager transactionManager;
@@ -320,7 +320,7 @@ public class FunctionAndTypeManager
         requireNonNull(functionNamespaceManagerName, "functionNamespaceManagerName is null");
         FunctionNamespaceManagerFactory factory = functionNamespaceManagerFactories.get(functionNamespaceManagerName);
         checkState(factory != null, "No factory for function namespace manager %s", functionNamespaceManagerName);
-        FunctionNamespaceManager<?> functionNamespaceManager = factory.create(catalogName, properties, new FunctionNamespaceManagerContext(this, nodeManager, this));
+        FunctionNamespaceManager<?> functionNamespaceManager = factory.create(catalogName, properties, new FunctionNamespaceManagerContext(this, nodeManager, this, this));
         functionNamespaceManager.setBlockEncodingSerde(blockEncodingSerde);
 
         transactionManager.registerFunctionNamespaceManager(catalogName, functionNamespaceManager);

@@ -274,4 +274,9 @@
             <unpack />
         </artifact>
     </artifactSet>
+    <artifactSet to="plugin/iceberg-function-namespace">
+        <artifact id="${project.groupId}:presto-iceberg-function-namespace:zip:${project.version}">
+            <unpack />
+        </artifact>
+    </artifactSet>
 </runtime>

@@ -23,15 +23,18 @@ public class FunctionNamespaceManagerContext
     private final TypeManager typeManager;
     private final NodeManager nodeManager;
     private final FunctionMetadataManager functionMetadataManager;
+    private final AbstractFunctionAndTypeManager functionAndTypeManager;
 
     public FunctionNamespaceManagerContext(
             TypeManager typeManager,
             NodeManager nodeManager,
-            FunctionMetadataManager functionMetadataManager)
+            FunctionMetadataManager functionMetadataManager,
+            AbstractFunctionAndTypeManager functionAndTypeManager)
     {
         this.typeManager = requireNonNull(typeManager, "typeManager is null");
         this.nodeManager = requireNonNull(nodeManager, "nodeManager is null");
         this.functionMetadataManager = requireNonNull(functionMetadataManager, "functionMetadataManager is null");
+        this.functionAndTypeManager = requireNonNull(functionAndTypeManager, "functionAndTypeManager is null");
     }
 
     public TypeManager getTypeManager()
@@ -47,5 +50,10 @@ public class FunctionNamespaceManagerContext
     public FunctionMetadataManager getFunctionMetadataManager()
     {
         return functionMetadataManager;
+    }
+
+    public AbstractFunctionAndTypeManager getFunctionAndTypeManager()
+    {
+        return functionAndTypeManager;
     }
 }

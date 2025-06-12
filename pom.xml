@@ -129,6 +129,7 @@
         <module>presto-hive-hadoop2</module>
         <module>presto-hive-metastore</module>
         <module>presto-iceberg</module>
+        <module>presto-iceberg-function-namespace</module>
         <module>presto-i18n-functions</module>
         <module>presto-teradata-functions</module>
         <module>presto-example-http</module>
